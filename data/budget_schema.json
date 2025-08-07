@@ -1,63 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "$defs": {
+    "category": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "amount": {
+          "oneOf": [
+            { "type": "number" },
+            { "type": "string", "enum": ["INHERITED"] }
+          ]
+        },
+        "subcategories": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/category" }
+        }
+      },
+      "required": ["category", "amount"]
+    }
+  },
   "properties": {
     "income": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "source",
-          "amount"
-        ]
-      }
+      "items": { "$ref": "#/$defs/category" }
     },
     "expenses": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "category": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "number"
-          },
-          "subcategories": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "category": {
-                  "type": "string"
-                },
-                "amount": {
-                  "oneOf":
-                "xxx"}
-              },
-              "required": [
-                "category",
-                "amount"
-              ]
-            }
-          }
-        },
-        "required": [
-          "category",
-          "amount"
-        ]
-      }
+      "items": { "$ref": "#/$defs/category" }
     }
   },
-  "required": [
-    "expenses"
-  ]
+  "required": ["expenses"]
 }

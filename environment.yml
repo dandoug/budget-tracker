@@ -12,3 +12,7 @@ dependencies:
     - pandas
     - pandas-stubs
     - plotly
+    - fuzzywuzzy
+    - reportlab
+    - python-Levenshtein
+    - jsonschema

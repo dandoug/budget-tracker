@@ -1,12 +1,19 @@
 """Main Streamlit application for budget tracking and reporting."""
-
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-from datetime import datetime, date, timedelta
-from typing import Optional, Dict, Any
-import tempfile
 import os
+import sys
+import tempfile
+from datetime import datetime, date, timedelta
+from pathlib import Path
+from typing import Optional
+
+import pandas as pd
+import streamlit as st
+
+# Ensure the project root (which contains the 'app' package) is on sys.path
+# This makes `from app.* import ...` work when this file is run from app/web
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 # Import our custom modules
 from app.parser.budget_loader import BudgetLoader, Budget
@@ -38,44 +45,51 @@ if 'chart_generator' not in st.session_state:
 
 def load_budget_file(uploaded_file) -> Optional[Budget]:
     """Load budget from uploaded file."""
+    tmp_path = None
     try:
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.yaml') as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            tmp_file_path = Path(tmp_file.name)
+            tmp_path = Path(tmp_file.name)
+        tmp_path.write_bytes(uploaded_file.getvalue())
 
         # Load budget
-        budget = BudgetLoader.load_budget(tmp_file_path)
-
-        # Clean up temp file
-        os.unlink(tmp_file_path)
-
+        budget = BudgetLoader.load_budget(tmp_path)
         return budget
     except Exception as e:
         st.error(f"Error loading budget file: {str(e)}")
         return None
+    finally:
+        if tmp_path:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                # Best effort cleanup; avoid breaking UI on delete issues
+                pass
 
 
 def load_simplifi_file(uploaded_file) -> Optional[pd.DataFrame]:
     """Load Simplifi data from uploaded file."""
+    tmp_path = None
     try:
         # Save uploaded file temporarily
         suffix = '.csv' if uploaded_file.name.endswith('.csv') else '.xlsx'
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            tmp_file_path = Path(tmp_file.name)
+            tmp_path = Path(tmp_file.name)
+        tmp_path.write_bytes(uploaded_file.getvalue())
 
         # Load data
         parser = SimplifiParser()
-        data = parser.load_file(tmp_file_path)
-
-        # Clean up temp file
-        os.unlink(tmp_file_path)
-
+        data = parser.load_file(tmp_path)
         return data
     except Exception as e:
         st.error(f"Error loading Simplifi file: {str(e)}")
         return None
+    finally:
+        if tmp_path:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 def main():
@@ -152,9 +166,9 @@ def main():
             st.code("""
 # Budget for 2025
 income:
-  - source: Salary
+  - category: Salary
     amount: 5000
-  - source: Side Business
+  - category: Side Business
     amount: 1000
 
 expenses:
@@ -192,13 +206,13 @@ expenses:
 
         # Income breakdown
         st.write("**Income Sources:**")
-        income_data = [{"Source": inc.source, "Amount": f"${inc.amount:,.2f}"} 
+        income_data = [{"Source": inc.category, "Amount": f"${inc.amount:,.2f}"}
                       for inc in st.session_state.budget.income]
         st.dataframe(pd.DataFrame(income_data), use_container_width=True)
 
         # Expense breakdown
         st.write("**Expense Categories:**")
-        expense_data = [{"Category": exp.category, "Amount": f"${exp.amount:,.2f}"} 
+        expense_data = [{"Category": exp.category, "Amount": f"${exp.amount:,.2f}"}
                        for exp in st.session_state.budget.expenses]
         st.dataframe(pd.DataFrame(expense_data), use_container_width=True)
 
@@ -284,7 +298,7 @@ expenses:
 
                     # Generate report
                     report_buffer = report_generator.generate_budget_report(
-                        variance_data, 
+                        variance_data,
                         summary_stats,
                         report_period="Current Analysis"
                     )
