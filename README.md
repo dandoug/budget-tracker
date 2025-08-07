@@ -81,7 +81,7 @@ expenses:
 ```
 
 ### Simplifi Export
-Export your P&L data from Simplifi as CSV or XLSX format and upload it through the web interface.
+Export your P&L data from Simplifi as XLSX format and upload it through the web interface.
 ### Web Interface
 1. **Upload Files**: Use the sidebar to upload your budget YAML and Simplifi export
 2. **Select Date Range**: Choose the analysis period
