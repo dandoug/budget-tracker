@@ -1,0 +1,331 @@
+"""Main Streamlit application for budget tracking and reporting."""
+
+import streamlit as st
+import pandas as pd
+from pathlib import Path
+from datetime import datetime, date, timedelta
+from typing import Optional, Dict, Any
+import tempfile
+import os
+
+# Import our custom modules
+from app.parser.budget_loader import BudgetLoader, Budget
+from app.parser.simplifi_parser import SimplifiParser
+from app.analysis.budget_analyzer import BudgetAnalyzer
+from app.analysis.category_matcher import CategoryMatcher
+from app.output.charts import ChartGenerator
+from app.output.report_generator import ReportGenerator
+
+
+# Page configuration
+st.set_page_config(
+    page_title="Budget Tracker",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Initialize session state
+if 'budget' not in st.session_state:
+    st.session_state.budget = None
+if 'actual_data' not in st.session_state:
+    st.session_state.actual_data = None
+if 'analyzer' not in st.session_state:
+    st.session_state.analyzer = None
+if 'chart_generator' not in st.session_state:
+    st.session_state.chart_generator = ChartGenerator()
+
+
+def load_budget_file(uploaded_file) -> Optional[Budget]:
+    """Load budget from uploaded file."""
+    try:
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.yaml') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_file_path = Path(tmp_file.name)
+
+        # Load budget
+        budget = BudgetLoader.load_budget(tmp_file_path)
+
+        # Clean up temp file
+        os.unlink(tmp_file_path)
+
+        return budget
+    except Exception as e:
+        st.error(f"Error loading budget file: {str(e)}")
+        return None
+
+
+def load_simplifi_file(uploaded_file) -> Optional[pd.DataFrame]:
+    """Load Simplifi data from uploaded file."""
+    try:
+        # Save uploaded file temporarily
+        suffix = '.csv' if uploaded_file.name.endswith('.csv') else '.xlsx'
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_file_path = Path(tmp_file.name)
+
+        # Load data
+        parser = SimplifiParser()
+        data = parser.load_file(tmp_file_path)
+
+        # Clean up temp file
+        os.unlink(tmp_file_path)
+
+        return data
+    except Exception as e:
+        st.error(f"Error loading Simplifi file: {str(e)}")
+        return None
+
+
+def main():
+    """Main application function."""
+    st.title("💰 Budget Tracker & Analyzer")
+    st.markdown("Upload your budget YAML file and Simplifi export to analyze your spending patterns.")
+
+    # Sidebar for file uploads and controls
+    with st.sidebar:
+        st.header("📁 Data Upload")
+
+        # Budget file upload
+        st.subheader("Budget Configuration")
+        budget_file = st.file_uploader(
+            "Upload Budget YAML",
+            type=['yaml', 'yml'],
+            help="Upload your budget definition file"
+        )
+
+        if budget_file is not None:
+            if st.session_state.budget is None or st.button("Reload Budget"):
+                st.session_state.budget = load_budget_file(budget_file)
+                if st.session_state.budget:
+                    st.success("Budget loaded successfully!")
+                    # Reset analyzer when budget changes
+                    st.session_state.analyzer = None
+
+        # Simplifi file upload
+        st.subheader("Actual Spending Data")
+        simplifi_file = st.file_uploader(
+            "Upload Simplifi Export",
+            type=['csv', 'xlsx'],
+            help="Upload your Simplifi P&L export file"
+        )
+
+        if simplifi_file is not None:
+            if st.session_state.actual_data is None or st.button("Reload Data"):
+                st.session_state.actual_data = load_simplifi_file(simplifi_file)
+                if st.session_state.actual_data is not None:
+                    st.success("Simplifi data loaded successfully!")
+                    # Reset analyzer when data changes
+                    st.session_state.analyzer = None
+
+        # Analysis controls
+        if st.session_state.budget and st.session_state.actual_data is not None:
+            st.header("📊 Analysis Controls")
+
+            # Date range selection
+            st.subheader("Date Range")
+            date_range = st.date_input(
+                "Select date range",
+                value=(date.today() - timedelta(days=30), date.today()),
+                help="Select the date range for analysis"
+            )
+
+            # Category detail level
+            st.subheader("Display Options")
+            show_subcategories = st.checkbox("Show subcategories", value=False)
+            chart_theme = st.selectbox(
+                "Chart theme",
+                ["plotly_white", "plotly_dark", "ggplot2", "seaborn"],
+                help="Select chart theme"
+            )
+
+            # Update chart theme
+            st.session_state.chart_generator.set_theme(chart_theme)
+
+    # Main content area
+    if st.session_state.budget is None:
+        st.info("👈 Please upload a budget YAML file to get started.")
+
+        # Show sample budget format
+        with st.expander("📝 Sample Budget Format"):
+            st.code("""
+# Budget for 2025
+income:
+  - source: Salary
+    amount: 5000
+  - source: Side Business
+    amount: 1000
+
+expenses:
+  - category: Housing
+    amount: 1500
+    subcategories:
+      - category: Rent
+        amount: 1400
+      - category: Renter's Insurance
+        amount: INHERITED
+  - category: Food
+    amount: 600
+  - category: Transportation
+    amount: 400
+            """, language="yaml")
+
+        return
+
+    # Display budget summary
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Income", f"${st.session_state.budget.get_total_income():,.2f}")
+    with col2:
+        st.metric("Total Expenses", f"${st.session_state.budget.get_total_expenses():,.2f}")
+    with col3:
+        net_budget = st.session_state.budget.get_net_budget()
+        st.metric("Net Budget", f"${net_budget:,.2f}", delta=None)
+
+    # If no actual data, show budget details only
+    if st.session_state.actual_data is None:
+        st.info("Upload Simplifi data to see budget vs actual analysis.")
+
+        # Show budget breakdown
+        st.subheader("📋 Budget Breakdown")
+
+        # Income breakdown
+        st.write("**Income Sources:**")
+        income_data = [{"Source": inc.source, "Amount": f"${inc.amount:,.2f}"} 
+                      for inc in st.session_state.budget.income]
+        st.dataframe(pd.DataFrame(income_data), use_container_width=True)
+
+        # Expense breakdown
+        st.write("**Expense Categories:**")
+        expense_data = [{"Category": exp.category, "Amount": f"${exp.amount:,.2f}"} 
+                       for exp in st.session_state.budget.expenses]
+        st.dataframe(pd.DataFrame(expense_data), use_container_width=True)
+
+        return
+
+    # Initialize analyzer if both budget and data are loaded
+    if st.session_state.analyzer is None:
+        st.session_state.analyzer = BudgetAnalyzer(st.session_state.budget)
+        st.session_state.analyzer.set_actual_data(st.session_state.actual_data)
+
+    # Analysis tabs
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📈 Charts", "📋 Details", "📄 Reports"])
+
+    with tab1:
+        st.header("Budget vs Actual Overview")
+
+        # Get summary statistics
+        summary_stats = st.session_state.analyzer.generate_summary_stats()
+
+        # Display summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Actual Income", f"${summary_stats['total_actual_income']:,.2f}")
+        with col2:
+            st.metric("Actual Expenses", f"${summary_stats['total_actual_expenses']:,.2f}")
+        with col3:
+            st.metric("Actual Net", f"${summary_stats['actual_net']:,.2f}")
+        with col4:
+            variance = summary_stats['actual_net'] - summary_stats['budgeted_net']
+            st.metric("Net Variance", f"${variance:,.2f}", delta=variance)
+
+        # Variance analysis
+        st.subheader("Category Variance Analysis")
+        variance_data = st.session_state.analyzer.calculate_variances()
+        st.dataframe(variance_data, use_container_width=True)
+
+        # Overspending alerts
+        overspending = st.session_state.analyzer.identify_overspending()
+        if overspending:
+            st.warning(f"⚠️ Overspending detected in: {', '.join(overspending)}")
+
+    with tab2:
+        st.header("Visual Analysis")
+
+        if not variance_data.empty:
+            # Budget vs Actual chart
+            fig1 = st.session_state.chart_generator.budget_vs_actual_bar(variance_data)
+            st.plotly_chart(fig1, use_container_width=True)
+
+            # Category pie chart
+            fig2 = st.session_state.chart_generator.category_pie_chart(variance_data)
+            st.plotly_chart(fig2, use_container_width=True)
+
+            # Summary chart
+            summary_stats = st.session_state.analyzer.generate_summary_stats()
+            fig3 = st.session_state.chart_generator.income_vs_expenses_summary(summary_stats)
+            st.plotly_chart(fig3, use_container_width=True)
+
+    with tab3:
+        st.header("Detailed Analysis")
+
+        # Raw data preview
+        st.subheader("Actual Spending Data Preview")
+        st.dataframe(st.session_state.actual_data.head(10), use_container_width=True)
+
+        # Category matching
+        st.subheader("Category Matching")
+        if st.button("Show Category Matching Analysis"):
+            # This would show how actual categories map to budget categories
+            st.info("Category matching analysis would be displayed here.")
+
+    with tab4:
+        st.header("Report Generation")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("📊 Generate PDF Report"):
+                try:
+                    report_generator = ReportGenerator()
+                    variance_data = st.session_state.analyzer.calculate_variances()
+                    summary_stats = st.session_state.analyzer.generate_summary_stats()
+
+                    # Generate report
+                    report_buffer = report_generator.generate_budget_report(
+                        variance_data, 
+                        summary_stats,
+                        report_period="Current Analysis"
+                    )
+
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=report_buffer.getvalue(),
+                        file_name=f"budget_report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf"
+                    )
+
+                except Exception as e:
+                    st.error(f"Error generating report: {str(e)}")
+
+        with col2:
+            if st.button("📈 Export to Excel"):
+                try:
+                    variance_data = st.session_state.analyzer.calculate_variances()
+
+                    # Create Excel file in memory
+                    output = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+
+                    with pd.ExcelWriter(output.name, engine='openpyxl') as writer:
+                        variance_data.to_excel(writer, sheet_name='Variance Analysis', index=False)
+                        st.session_state.actual_data.to_excel(writer, sheet_name='Raw Data', index=False)
+
+                    # Read the file for download
+                    with open(output.name, 'rb') as f:
+                        st.download_button(
+                            label="📥 Download Excel File",
+                            data=f.read(),
+                            file_name=f"budget_analysis_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+
+                    # Clean up
+                    os.unlink(output.name)
+
+                except Exception as e:
+                    st.error(f"Error exporting to Excel: {str(e)}")
+
+
+if __name__ == "__main__":
+    main()

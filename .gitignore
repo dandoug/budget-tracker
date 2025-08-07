@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+
+# IDE
+.idea/
+.vscode/
+
+# Project specific
+data/*
+!data/README.md
+!data/budget_schema.json
+
+# Misc
+.DS_Store

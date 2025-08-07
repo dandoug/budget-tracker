@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "income": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "source",
+          "amount"
+        ]
+      }
+    },
+    "expenses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "subcategories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "amount": {
+                  "oneOf":
+                "xxx"}
+              },
+              "required": [
+                "category",
+                "amount"
+              ]
+            }
+          }
+        },
+        "required": [
+          "category",
+          "amount"
+        ]
+      }
+    }
+  },
+  "required": [
+    "expenses"
+  ]
+}

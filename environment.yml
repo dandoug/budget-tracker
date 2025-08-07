@@ -1,0 +1,14 @@
+name: budget-tracker
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+    - streamlit
+    - pydantic
+    - pyyaml
+    - pandas
+    - pandas-stubs
+    - plotly
