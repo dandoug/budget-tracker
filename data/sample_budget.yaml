@@ -1,0 +1,19 @@
+# Budget for 2025
+income:
+  - category: Salary
+    amount: 5000
+  - category: Side Business
+    amount: 1000
+
+expenses:
+  - category: Housing
+    amount: 1500
+    subcategories:
+      - category: Rent
+        amount: 1400
+      - category: Renter's Insurance
+        amount: INHERITED
+  - category: Food
+    amount: 600
+  - category: Transportation
+    amount: 400

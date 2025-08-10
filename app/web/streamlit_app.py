@@ -8,6 +8,7 @@ from typing import Optional
 
 import pandas as pd
 import streamlit as st
+import yaml
 
 # Ensure the project root (which contains the 'app' package) is on sys.path
 # This makes `from app.* import ...` work when this file is run from app/web
@@ -162,28 +163,11 @@ def main():
         st.info("👈 Please upload a budget YAML file to get started.")
 
         # Show sample budget format
+        sample_budget_path = _PROJECT_ROOT / "data" / "sample_budget.yaml"
+        with open(sample_budget_path, "r") as f:
+            sample_budget = f.read()
         with st.expander("📝 Sample Budget Format"):
-            st.code("""
-# Budget for 2025
-income:
-  - category: Salary
-    amount: 5000
-  - category: Side Business
-    amount: 1000
-
-expenses:
-  - category: Housing
-    amount: 1500
-    subcategories:
-      - category: Rent
-        amount: 1400
-      - category: Renter's Insurance
-        amount: INHERITED
-  - category: Food
-    amount: 600
-  - category: Transportation
-    amount: 400
-            """, language="yaml")
+            st.code(sample_budget, language="yaml")
 
         return
 

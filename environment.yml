@@ -17,3 +17,4 @@ dependencies:
     - python-Levenshtein
     - jsonschema
     - watchdog
+    - openpyxl
