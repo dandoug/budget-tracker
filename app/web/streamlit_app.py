@@ -191,16 +191,16 @@ def main():
         # Income breakdown
         st.write("**Income Sources:**")
         income_data = [{"Source": inc.category, "Amount": f"${inc.amount:,.2f}"}
-                      for inc in st.session_state.budget.income]
+                       for inc in st.session_state.budget.get_income_categories()]
         st.dataframe(pd.DataFrame(income_data), use_container_width=True)
 
         # Expense breakdown
         st.write("**Expense Categories:**")
         expense_data = [{"Category": exp.category, "Amount": f"${exp.amount:,.2f}"}
-                       for exp in st.session_state.budget.expenses]
+                        for exp in st.session_state.budget.get_expense_categories()]
         st.dataframe(pd.DataFrame(expense_data), use_container_width=True)
 
-        return
+    return
 
     # Initialize analyzer if both budget and data are loaded
     if st.session_state.analyzer is None:

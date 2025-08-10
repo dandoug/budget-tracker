@@ -77,6 +77,22 @@ class Budget(BaseModel):
 
         return data
 
+    def _iter_categories_with_amount(self, categories: List[Category]):
+        """Yield categories (including subcategories) that have a non-None amount."""
+        for cat in categories:
+            if cat.amount is not None:
+                yield cat
+            if cat.subcategories:
+                yield from self._iter_categories_with_amount(cat.subcategories)
+
+    def get_income_categories(self) -> List[Category]:
+        """Return all income categories (including subcategories) with a defined amount."""
+        return list(self._iter_categories_with_amount(self.income))
+
+    def get_expense_categories(self) -> List[Category]:
+        """Return all expense categories (including subcategories) with a defined amount."""
+        return list(self._iter_categories_with_amount(self.expenses))
+
     def get_total_income(self) -> float:
         """Calculate total budgeted income."""
         return sum(category.get_total_amount() for category in self.income)
