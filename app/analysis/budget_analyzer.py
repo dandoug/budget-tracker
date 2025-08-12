@@ -21,7 +21,7 @@ class BudgetAnalyzer:
         """Set actual spending data."""
         self.actual_data = data
         # Initialize category matcher with budget categories
-        budget_categories = [exp.category for exp in self.budget.expenses]
+        budget_categories = [exp.category for exp in self.budget.get_expense_categories()]
         self.matcher = CategoryMatcher(budget_categories)
 
     def calculate_variances(self, month: Optional[str] = None) -> pd.DataFrame:
@@ -29,20 +29,46 @@ class BudgetAnalyzer:
         if self.actual_data is None:
             raise ValueError("No actual data set. Call set_actual_data() first.")
 
-        # TODO: Implement variance calculation logic
         variances = []
 
-        for expense in self.budget.expenses:
+        # actual_data contains data for several months.  Calculate the total number of
+        # months by subtracting 3 from the number of columns in the dataframe (Category, HierarchyLevel, Total)
+        num_of_months = max(self.actual_data.shape[1] - 3, 0)
+
+        actual_spending = self.summarize_totals_by_budget_category()
+
+        # Limit series to just expenses
+        all_budget_expense_cats = [exp.category for exp in self.budget.get_expense_categories()]
+        actual_spending = actual_spending.reindex(all_budget_expense_cats, fill_value=0.0)
+
+        for expense in self.budget.get_expense_categories():
+            # Find matching actual spending using matched categories
+            actual = actual_spending.get(expense.category, 0.0)
+            budget_amount = expense.amount * num_of_months
+
+            variance = actual + budget_amount
+
             variance_data = {
                 'category': expense.category,
-                'budgeted': expense.amount,
-                'actual': 0.0,  # TODO: Calculate from actual data
-                'variance': 0.0,  # actual - budgeted
-                'variance_percent': 0.0  # (variance / budgeted) * 100
+                'budgeted': budget_amount,
+                'actual': actual,
+                'variance': variance,
+                'variance_percent': (variance / budget_amount) * -100 if budget_amount != 0 else 0.0
             }
             variances.append(variance_data)
 
         return pd.DataFrame(variances)
+
+    def summarize_totals_by_budget_category(self) -> pd.Series:
+        """Calculate totals by budget category."""
+        # Create a simplified view of actual data grouped by matched categories
+        actual_spending = self.actual_data[['Category', 'Total']].copy()
+        actual_spending['Budget_Category'] = actual_spending['Category'].apply(
+            lambda x: self.budget.get_budget_category(x).category if self.budget.get_budget_category(x) else None
+        )
+        actual_spending = actual_spending[actual_spending['Budget_Category'].notna()]
+        actual_spending = actual_spending.groupby('Budget_Category')['Total'].sum()
+        return actual_spending
 
     def get_spending_trends(self, category: Optional[str] = None) -> pd.DataFrame:
         """Get spending trends over time."""
@@ -88,12 +114,22 @@ class BudgetAnalyzer:
                 'actual_net': 0.0
             }
 
-        # TODO: Calculate actual totals from data
+        actual_inc_and_expenses_by_category = self.summarize_totals_by_budget_category()
+        income_categories = [cat.category for cat in self.budget.get_income_categories()]
+        expense_categories = [cat.category for cat in self.budget.get_expense_categories()]
+        all_categories = income_categories + expense_categories
+        # Ensure all the categories have some entry, so the .sum() operations below work
+        actual_inc_and_expenses_by_category = actual_inc_and_expenses_by_category.reindex(
+            all_categories, fill_value=0.0)
+        
+        actual_income = actual_inc_and_expenses_by_category[income_categories].sum()
+        actual_expenses = actual_inc_and_expenses_by_category[expense_categories].sum()
+
         return {
             'total_budgeted_income': self.budget.get_total_income(),
             'total_budgeted_expenses': self.budget.get_total_expenses(),
             'budgeted_net': self.budget.get_net_budget(),
-            'total_actual_income': 0.0,  # TODO: Calculate from actual data
-            'total_actual_expenses': 0.0,  # TODO: Calculate from actual data
-            'actual_net': 0.0  # TODO: Calculate from actual data
+            'total_actual_income': actual_income,
+            'total_actual_expenses': actual_expenses,
+            'actual_net': actual_income + actual_expenses  # expenses are negative
         }

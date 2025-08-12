@@ -172,21 +172,28 @@ def main():
         return
 
     # Display budget summary
+    # First check to see if data is loaded and if so, compute the number of months
+    # used for the analysis
+    if st.session_state.actual_data is None:
+        num_of_months = 1
+    else:
+        num_of_months = st.session_state.actual_data.shape[1] - 3
+
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Income", f"${st.session_state.budget.get_total_income():,.2f}")
+        st.metric("Total Income", f"${st.session_state.budget.get_total_income()*num_of_months:,.2f}")
     with col2:
-        st.metric("Total Expenses", f"${st.session_state.budget.get_total_expenses():,.2f}")
+        st.metric("Total Expenses", f"${st.session_state.budget.get_total_expenses()*num_of_months:,.2f}")
     with col3:
         net_budget = st.session_state.budget.get_net_budget()
-        st.metric("Net Budget", f"${net_budget:,.2f}", delta=None)
+        st.metric("Net Budget", f"${net_budget*num_of_months:,.2f}", delta=None)
 
     # If no actual data, show budget details only
     if st.session_state.actual_data is None:
         st.info("Upload Simplifi data to see budget vs actual analysis.")
 
         # Show budget breakdown
-        st.subheader("📋 Budget Breakdown")
+        st.subheader("📋 Monthly Budget Breakdown")
 
         # Income breakdown
         st.write("**Income Sources:**")
@@ -200,7 +207,7 @@ def main():
                         for exp in st.session_state.budget.get_expense_categories()]
         st.dataframe(pd.DataFrame(expense_data), use_container_width=True)
 
-    return
+        return
 
     # Initialize analyzer if both budget and data are loaded
     if st.session_state.analyzer is None:

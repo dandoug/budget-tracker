@@ -4,7 +4,7 @@ import yaml
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, PrivateAttr
 import jsonschema
 
 
@@ -49,6 +49,9 @@ class Budget(BaseModel):
     """Complete budget definition."""
     income: List[Category]
     expenses: List[Category]
+    # Private attribute to hold the category -> budget_category map
+    _budget_category_map: Dict[str, Category] = PrivateAttr(default_factory=dict)
+
 
     @model_validator(mode='before')
     @classmethod
@@ -77,6 +80,30 @@ class Budget(BaseModel):
 
         return data
 
+    def model_post_init(self, __context) -> None:
+        """Build the category -> budget_category map after validation."""
+        self._budget_category_map.clear()
+
+        def populate_map(categories: List[Category], current_budget_cat: Optional[Category]) -> None:
+            for cat in categories:
+                # If this category specifies an amount, it becomes the current budget category
+                next_budget_cat = cat if cat.amount is not None else current_budget_cat
+
+                # Map this category's name to the nearest ancestor with an amount (or itself)
+                if next_budget_cat is not None:
+                    # Note: This uses the category name as key. If names are duplicated across trees,
+                    # later entries will overwrite earlier ones.
+                    self._budget_category_map[cat.category] = next_budget_cat
+
+                # Recurse into subcategories carrying the nearest budget category
+                if cat.subcategories:
+                    populate_map(cat.subcategories, next_budget_cat)
+
+        # Build for both income and expenses trees
+        populate_map(self.income, None)
+        populate_map(self.expenses, None)
+
+
     def _iter_categories_with_amount(self, categories: List[Category]):
         """Yield categories (including subcategories) that have a non-None amount."""
         for cat in categories:
@@ -84,6 +111,14 @@ class Budget(BaseModel):
                 yield cat
             if cat.subcategories:
                 yield from self._iter_categories_with_amount(cat.subcategories)
+
+    def get_budget_category(self, cat: str) -> Category:
+        """Use the budget category map to return the budget category for a category name"""
+        return self._budget_category_map[cat] if cat in self._budget_category_map else None
+
+    @property
+    def budget_category_map(self) -> Dict[str, Category]:
+        return self._budget_category_map
 
     def get_income_categories(self) -> List[Category]:
         """Return all income categories (including subcategories) with a defined amount."""
@@ -95,11 +130,11 @@ class Budget(BaseModel):
 
     def get_total_income(self) -> float:
         """Calculate total budgeted income."""
-        return sum(category.get_total_amount() for category in self.income)
+        return sum(category.get_total_amount() for category in self.get_income_categories())
 
     def get_total_expenses(self) -> float:
         """Calculate total budgeted expenses."""
-        return sum(category.get_total_amount() for category in self.expenses)
+        return sum(category.get_total_amount() for category in self.get_expense_categories())
 
     def get_net_budget(self) -> float:
         """Calculate net budget (income - expenses)."""

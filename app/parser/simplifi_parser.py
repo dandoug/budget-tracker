@@ -1,5 +1,5 @@
 """Simplifi P&L report parser."""
-
+import openpyxl
 import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -20,9 +20,29 @@ class SimplifiParser:
         """Load Simplifi export file."""
         try:
             if file_path.suffix.lower() == '.csv':
-                df = pd.read_csv(file_path)
+                raise ValueError(f"Switching to only xlsx, not supported: {file_path.suffix}")
+                # df = pd.read_csv(file_path)
             elif file_path.suffix.lower() in ['.xlsx', '.xls']:
+                # Load the workbook and select the active sheet to get outline level
+                workbook = openpyxl.load_workbook(file_path)
+                sheet = workbook.active
+                # Create an empty list to hold the levels
+                outline_levels = []
+
+                # Loop ONLY through the rows that contain data to build outline level column
+                # Data starts on Excel row 2, after title, min_row=2 skips the title
+                # sheet.iter_rows() is efficient for this.
+                for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
+                    # The first cell in the row tuple gives us access to its properties
+                    level = sheet.row_dimensions[row[0].row].outline_level
+                    outline_levels.append(level)
+
+                # Read the dataframe grid
                 df = pd.read_excel(file_path)
+
+                # Add the hierarchy level column
+                df['HierarchyLevel'] = outline_levels
+
             else:
                 raise ValueError(f"Unsupported file format: {file_path.suffix}")
 
@@ -35,14 +55,42 @@ class SimplifiParser:
 
     def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and standardize the imported data."""
-        # TODO: Implement data cleaning based on actual Simplifi export format
-        # This is a placeholder - needs to be updated based on actual file structure
         df_clean = df.copy()
 
-        # Convert date columns if present
-        date_columns = [col for col in df.columns if 'date' in col.lower()]
-        for col in date_columns:
-            df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
+        # 2) Normalize numeric-looking object columns:
+        #    - remove leading "\'" or "'" artifacts
+        #    - remove thousands separators
+        #    - convert (123.45) -> -123.45
+        #    - coerce to numeric
+        obj_cols = df_clean.select_dtypes(include=['object']).columns.tolist()
+
+        def to_numeric_series(s: pd.Series) -> pd.Series:
+            # Work on string view
+            s_str = s.astype(str).str.strip()
+
+            # Strip leading \" and ' characters that may prefix negatives, e.g., "\'-315.87"
+            s_str = s_str.str.replace(r"^[\\']+", "", regex=True)
+
+            # Remove common currency/spacing artifacts (keep digits, minus, dot, parentheses, comma)
+            # First handle parentheses negatives
+            s_str = s_str.str.replace(r"^\((.*)\)$", r"-\1", regex=True)
+
+            # Drop commas as thousand separators
+            s_str = s_str.str.replace(",", "", regex=False)
+
+            # Finally, to_numeric
+            return pd.to_numeric(s_str, errors='coerce')
+
+        for col in obj_cols:
+            parsed = to_numeric_series(df_clean[col])
+            # Only convert the column if a significant portion parsed as numbers
+            # (tune threshold as needed)
+            if parsed.notna().mean() >= 0.6:
+                df_clean[col] = parsed
+
+        # 2) Replace NaN with 0 only for numeric columns
+        num_cols = df_clean.select_dtypes(include=['number']).columns
+        df_clean[num_cols] = df_clean[num_cols].fillna(0)
 
         return df_clean
 
