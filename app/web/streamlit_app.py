@@ -138,12 +138,31 @@ def main():
         if st.session_state.budget and st.session_state.actual_data is not None:
             st.header("📊 Analysis Controls")
 
-            # Date range selection
-            st.subheader("Date Range")
-            date_range = st.date_input(
-                "Select date range",
-                value=(date.today() - timedelta(days=30), date.today()),
-                help="Select the date range for analysis"
+            # Date month range selection
+            # Get all column names from actual_data
+            columns = list(st.session_state.actual_data.columns)
+
+            # Remove Category, Total, and HierarchyLevel from options
+            exclude_cols = ['Category', 'Total', 'HierarchyLevel']
+            month_columns = [col for col in columns if col not in exclude_cols]
+
+            # Create options list with (label, index) tuples
+            month_options = [(col, idx) for idx, col in enumerate(columns) if col in month_columns]
+
+            # Beginning month selection
+            st.subheader("Select Month Range")
+            start_month = st.selectbox(
+                "Start Month",
+                options=month_options,
+                format_func=lambda x: x[0],
+                index=0
+            )
+
+            end_month = st.selectbox(
+                "End Month",
+                options=month_options,
+                format_func=lambda x: x[0],
+                index=len(month_options) - 1
             )
 
             # Category detail level
@@ -174,19 +193,41 @@ def main():
     # Display budget summary
     # First check to see if data is loaded and if so, compute the number of months
     # used for the analysis
+    col1, col2, col3 = st.columns(3)
+
     if st.session_state.actual_data is None:
         num_of_months = 1
+        with col1:
+            st.metric("Total Income", f"${st.session_state.budget.get_total_income() * num_of_months:,.2f}")
+        with col2:
+            st.metric("Total Expenses", f"${st.session_state.budget.get_total_expenses() * num_of_months:,.2f}")
+        with col3:
+            net_budget = st.session_state.budget.get_net_budget()
+            st.metric("Net Budget", f"${net_budget * num_of_months:,.2f}", delta=None)
     else:
-        num_of_months = st.session_state.actual_data.shape[1] - 3
+        # Get the number of months between beginning and end months
+        num_of_months = end_month[1] - start_month[1] + 1
+        st.session_state.analyzer = BudgetAnalyzer(st.session_state.budget)
+        st.session_state.analyzer.set_actual_data(st.session_state.actual_data)
+        st.session_state.analyzer.set_analysis_date_range(start_month=start_month, end_month=end_month)
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Income", f"${st.session_state.budget.get_total_income()*num_of_months:,.2f}")
-    with col2:
-        st.metric("Total Expenses", f"${st.session_state.budget.get_total_expenses()*num_of_months:,.2f}")
-    with col3:
-        net_budget = st.session_state.budget.get_net_budget()
-        st.metric("Net Budget", f"${net_budget*num_of_months:,.2f}", delta=None)
+        # Get summary statistics
+        summary_stats = st.session_state.analyzer.generate_summary_stats()
+        with col1:
+            st.metric("Total Income", f"${summary_stats['total_budgeted_income']:,.2f}")
+        with col2:
+            st.metric("Total Expenses", f"${summary_stats['total_budgeted_expenses']:,.2f}")
+        with col3:
+            net_budget = st.session_state.budget.get_net_budget()
+            st.metric("Net Budget", f"${summary_stats['budgeted_net']:,.2f}", delta=None)
+
+
+
+
+    if num_of_months > 1:
+        st.write(f"**Note:** This analysis is based on {num_of_months} months of data.")
+    else:
+        st.write("**Note:** This analysis is based on a single month of data.")
 
     # If no actual data, show budget details only
     if st.session_state.actual_data is None:
@@ -209,19 +250,13 @@ def main():
 
         return
 
-    # Initialize analyzer if both budget and data are loaded
-    if st.session_state.analyzer is None:
-        st.session_state.analyzer = BudgetAnalyzer(st.session_state.budget)
-        st.session_state.analyzer.set_actual_data(st.session_state.actual_data)
+
 
     # Analysis tabs
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📈 Charts", "📋 Details", "📄 Reports"])
 
     with tab1:
         st.header("Budget vs Actual Overview")
-
-        # Get summary statistics
-        summary_stats = st.session_state.analyzer.generate_summary_stats()
 
         # Display summary metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -233,7 +268,8 @@ def main():
             st.metric("Actual Net", f"${summary_stats['actual_net']:,.2f}")
         with col4:
             variance = summary_stats['actual_net'] - summary_stats['budgeted_net']
-            st.metric("Net Variance", f"${variance:,.2f}", delta=variance)
+            variance_pct = (variance / summary_stats['budgeted_net']) * 100
+            st.metric("Net Variance", f"${variance:,.2f}", delta=f"{variance_pct:.2f}%")
 
         # Variance analysis
         st.subheader("Category Variance Analysis")

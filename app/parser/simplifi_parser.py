@@ -30,7 +30,7 @@ class SimplifiParser:
                 outline_levels = []
 
                 # Loop ONLY through the rows that contain data to build outline level column
-                # Data starts on Excel row 2, after title, min_row=2 skips the title
+                # Data starts on Excel row 2; after title, min_row=2 skips the title
                 # sheet.iter_rows() is efficient for this.
                 for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
                     # The first cell in the row tuple gives us access to its properties
@@ -59,7 +59,7 @@ class SimplifiParser:
 
         # 2) Normalize numeric-looking object columns:
         #    - remove leading "\'" or "'" artifacts
-        #    - remove thousands separators
+        #    - remove any thousands separators
         #    - convert (123.45) -> -123.45
         #    - coerce to numeric
         obj_cols = df_clean.select_dtypes(include=['object']).columns.tolist()
@@ -95,7 +95,7 @@ class SimplifiParser:
         return df_clean
 
     def get_monthly_summary(self, start_date: str = None, end_date: str = None) -> pd.DataFrame:
-        """Generate monthly summary of income/expenses by category."""
+        """Generate a monthly summary of income/expenses by category."""
         if self.data is None:
             raise ValueError("No data loaded. Call load_file() first.")
 

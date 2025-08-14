@@ -16,6 +16,8 @@ class BudgetAnalyzer:
         self.budget = budget
         self.actual_data: Optional[pd.DataFrame] = None
         self.matcher: Optional[CategoryMatcher] = None
+        self.start_month: Optional[Tuple[str,int]] = None # format is (columname, columindex)
+        self.end_month: Optional[Tuple[str,int]] = None
 
     def set_actual_data(self, data: pd.DataFrame) -> None:
         """Set actual spending data."""
@@ -23,6 +25,13 @@ class BudgetAnalyzer:
         # Initialize category matcher with budget categories
         budget_categories = [exp.category for exp in self.budget.get_expense_categories()]
         self.matcher = CategoryMatcher(budget_categories)
+        
+    def set_analysis_date_range(self, start_month: tuple[str,int], end_month: tuple[str,int]) -> None:
+        """Set date range for analysis."""
+        if self.actual_data is None:
+            raise ValueError("No actual data set. Call set_actual_data() first.")
+        self.start_month = start_month
+        self.end_month = end_month
 
     def calculate_variances(self, month: Optional[str] = None) -> pd.DataFrame:
         """Calculate budget vs actual variances."""
@@ -32,8 +41,8 @@ class BudgetAnalyzer:
         variances = []
 
         # actual_data contains data for several months.  Calculate the total number of
-        # months by subtracting 3 from the number of columns in the dataframe (Category, HierarchyLevel, Total)
-        num_of_months = max(self.actual_data.shape[1] - 3, 0)
+        # months by finding the difference between the start and end months indexes
+        num_of_months = self.end_month[1] - self.start_month[1] + 1
 
         actual_spending = self.summarize_totals_by_budget_category()
 
@@ -61,8 +70,16 @@ class BudgetAnalyzer:
 
     def summarize_totals_by_budget_category(self) -> pd.Series:
         """Calculate totals by budget category."""
+        # Create a copy of actual data that includes the category column and only
+        # the data columns from the start_month to end_month
+        columns_to_include = ['Category'] + list(self.actual_data.columns[self.start_month[1]:self.end_month[1] + 1])
+        actual_data_subset = self.actual_data[columns_to_include].copy()
+
+        # Sum across all months to get total
+        actual_data_subset['Total'] = actual_data_subset.iloc[:, 1:].sum(axis=1)
+
         # Create a simplified view of actual data grouped by matched categories
-        actual_spending = self.actual_data[['Category', 'Total']].copy()
+        actual_spending = actual_data_subset[['Category', 'Total']].copy()
         actual_spending['Budget_Category'] = actual_spending['Category'].apply(
             lambda x: self.budget.get_budget_category(x).category if self.budget.get_budget_category(x) else None
         )
@@ -125,10 +142,12 @@ class BudgetAnalyzer:
         actual_income = actual_inc_and_expenses_by_category[income_categories].sum()
         actual_expenses = actual_inc_and_expenses_by_category[expense_categories].sum()
 
+        num_of_months = self.end_month[1] - self.start_month[1] + 1
+
         return {
-            'total_budgeted_income': self.budget.get_total_income(),
-            'total_budgeted_expenses': self.budget.get_total_expenses(),
-            'budgeted_net': self.budget.get_net_budget(),
+            'total_budgeted_income': self.budget.get_total_income()*num_of_months,
+            'total_budgeted_expenses': self.budget.get_total_expenses()*num_of_months,
+            'budgeted_net': self.budget.get_net_budget()*num_of_months,
             'total_actual_income': actual_income,
             'total_actual_expenses': actual_expenses,
             'actual_net': actual_income + actual_expenses  # expenses are negative
