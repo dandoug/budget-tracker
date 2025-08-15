@@ -55,13 +55,13 @@ class BudgetAnalyzer:
             actual = actual_spending.get(expense.category, 0.0)
             budget_amount = expense.amount * num_of_months
 
-            variance = actual + budget_amount
+            variance = budget_amount + actual # actual spend is negative
 
             variance_data = {
                 'category': expense.category,
                 'budgeted': budget_amount,
-                'actual': actual,
-                'variance': variance,
+                'actual': -actual,
+                'variance': -variance,  # spending less than budget is negative variance
                 'variance_percent': (variance / budget_amount) * -100 if budget_amount != 0 else 0.0
             }
             variances.append(variance_data)

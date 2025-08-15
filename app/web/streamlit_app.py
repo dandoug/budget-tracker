@@ -274,7 +274,24 @@ def main():
         # Variance analysis
         st.subheader("Category Variance Analysis")
         variance_data = st.session_state.analyzer.calculate_variances()
-        st.dataframe(variance_data, use_container_width=True)
+        st.dataframe(variance_data,
+                     column_config={
+                         "category": st.column_config.TextColumn("Category"),
+                         "budgeted": st.column_config.NumberColumn("Budgeted",
+                                                                   format="$%.2f",
+                                                                   help="USD"),
+                         "actual": st.column_config.NumberColumn("Actual",
+                                                                 format="$%.2f",
+                                                                 help="USD"),
+                         "variance": st.column_config.NumberColumn("Variance",
+                                                                   format="$%.2f",
+                                                                   help="USD"),
+                         "variance_percent": st.column_config.NumberColumn(
+                             "Variance %",
+                             format="%.1f%%"
+                         ),
+                     }
+        )
 
         # Overspending alerts
         overspending = st.session_state.analyzer.identify_overspending()
