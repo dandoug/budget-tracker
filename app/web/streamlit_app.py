@@ -263,7 +263,7 @@ def main():
         with col1:
             st.metric("Actual Income", f"${summary_stats['total_actual_income']:,.2f}")
         with col2:
-            st.metric("Actual Expenses", f"${summary_stats['total_actual_expenses']:,.2f}")
+            st.metric("Actual Expenses", f"${-1*summary_stats['total_actual_expenses']:,.2f}")
         with col3:
             st.metric("Actual Net", f"${summary_stats['actual_net']:,.2f}")
         with col4:
