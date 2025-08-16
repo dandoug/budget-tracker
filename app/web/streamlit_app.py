@@ -165,9 +165,26 @@ def main():
                 index=len(month_options) - 1
             )
 
-            # Category detail level
-            st.subheader("Display Options")
-            show_subcategories = st.checkbox("Show subcategories", value=False)
+
+            # Threshold percentage selection
+            st.subheader("Threshold Settings")
+            threshold_options = [(2.0, "2%"), (5.0, "5%"), (10.0, "10%"), (25.0, "25%"), (50.0, "50%")]
+            threshold = st.selectbox(
+                "Variance Threshold",
+                options=threshold_options,
+                format_func=lambda x: x[1],
+                index=2,  # Default to 10%
+                help="Threshold for highlighting significant variances"
+            )
+            st.session_state.threshold = threshold[0]
+
+            st.session_state.only_show_overspend_categories = st.checkbox(
+                "Only show overspend categories",
+                value=False,
+                help="Show only categories where actual spending exceeds budget by threshold"
+            )
+
+            st.subheader("Chart Controls")
             chart_theme = st.selectbox(
                 "Chart theme",
                 ["plotly_white", "plotly_dark", "ggplot2", "seaborn"],
@@ -210,6 +227,8 @@ def main():
         st.session_state.analyzer = BudgetAnalyzer(st.session_state.budget)
         st.session_state.analyzer.set_actual_data(st.session_state.actual_data)
         st.session_state.analyzer.set_analysis_date_range(start_month=start_month, end_month=end_month)
+        st.session_state.analyzer.set_only_overspend(st.session_state.only_show_overspend_categories)
+        st.session_state.analyzer.set_overspend_threshold(st.session_state.threshold)
 
         # Get summary statistics
         summary_stats = st.session_state.analyzer.generate_summary_stats()
@@ -246,7 +265,8 @@ def main():
         st.write("**Expense Categories:**")
         expense_data = [{"Category": exp.category, "Amount": f"${exp.amount:,.2f}"}
                         for exp in st.session_state.budget.get_expense_categories()]
-        st.dataframe(pd.DataFrame(expense_data), use_container_width=True)
+        budget_expense_df = pd.DataFrame(expense_data)
+        st.dataframe(budget_expense_df, use_container_width=True)
 
         return
 
@@ -294,7 +314,7 @@ def main():
         )
 
         # Overspending alerts
-        overspending = st.session_state.analyzer.identify_overspending()
+        overspending = st.session_state.analyzer.identify_overspending(st.session_state.threshold)
         if overspending:
             st.warning(f"⚠️ Overspending detected in: {', '.join(overspending)}")
 
@@ -306,8 +326,7 @@ def main():
             fig1 = st.session_state.chart_generator.budget_vs_actual_bar(variance_data)
             st.plotly_chart(fig1, use_container_width=True)
 
-            # Category pie chart
-            fig2 = st.session_state.chart_generator.category_pie_chart(variance_data)
+            fig2 = st.session_state.chart_generator.expenses_waterfall(variance_data.dropna())
             st.plotly_chart(fig2, use_container_width=True)
 
             # Summary chart
@@ -316,17 +335,10 @@ def main():
             st.plotly_chart(fig3, use_container_width=True)
 
     with tab3:
-        st.header("Detailed Analysis")
+        st.header("Raw Data Loaded")
 
-        # Raw data preview
-        st.subheader("Actual Spending Data Preview")
-        st.dataframe(st.session_state.actual_data.head(10), use_container_width=True)
-
-        # Category matching
-        st.subheader("Category Matching")
-        if st.button("Show Category Matching Analysis"):
-            # This would show how actual categories map to budget categories
-            st.info("Category matching analysis would be displayed here.")
+        indexed_df = st.session_state.actual_data.set_index('Category')
+        st.dataframe(indexed_df, use_container_width=True)
 
     with tab4:
         st.header("Report Generation")
@@ -344,7 +356,7 @@ def main():
                     report_buffer = report_generator.generate_budget_report(
                         variance_data,
                         summary_stats,
-                        report_period="Current Analysis"
+                        report_period=f"{start_month[0]} to {end_month[0]}"
                     )
 
                     st.download_button(

@@ -30,19 +30,19 @@ class ChartGenerator:
 
         return fig
 
-    def variance_waterfall(self, variance_data: pd.DataFrame) -> go.Figure:
-        """Create variance waterfall chart."""
+    def expenses_waterfall(self, variance_data: pd.DataFrame) -> go.Figure:
+        """Create expenses waterfall chart."""
         fig = go.Figure(go.Waterfall(
-            name="Variance Analysis",
+            name="Expense Analysis",
             orientation="v",
             measure=["relative"] * len(variance_data),
             x=variance_data['category'],
-            y=variance_data['variance'],
+            y=variance_data['actual'],
             connector={"line": {"color": "rgb(63, 63, 63)"}},
         ))
 
         fig.update_layout(
-            title="Budget Variance Waterfall",
+            title="Actual Expenses Waterfall",
             template=self.theme
         )
 
@@ -75,7 +75,7 @@ class ChartGenerator:
         categories = ['Income', 'Expenses', 'Net']
         budgeted = [
             summary_stats['total_budgeted_income'],
-            -summary_stats['total_budgeted_expenses'],  # Negative for expenses
+            summary_stats['total_budgeted_expenses'],  # Negative for expenses
             summary_stats['budgeted_net']
         ]
         actual = [

@@ -18,6 +18,8 @@ class BudgetAnalyzer:
         self.matcher: Optional[CategoryMatcher] = None
         self.start_month: Optional[Tuple[str,int]] = None # format is (columname, columindex)
         self.end_month: Optional[Tuple[str,int]] = None
+        self.overspend_threshold: Optional[float] = 10.0
+        self.only_overspend: Optional[bool] = False
 
     def set_actual_data(self, data: pd.DataFrame) -> None:
         """Set actual spending data."""
@@ -33,7 +35,15 @@ class BudgetAnalyzer:
         self.start_month = start_month
         self.end_month = end_month
 
-    def calculate_variances(self, month: Optional[str] = None) -> pd.DataFrame:
+    def set_overspend_threshold(self, threshold: float) -> None:
+        """Set overspend threshold."""
+        self.overspend_threshold = threshold
+
+    def set_only_overspend(self, only_overspend: bool) -> None:
+        """Set only overspend."""
+        self.only_overspend = only_overspend
+
+    def calculate_variances(self) -> pd.DataFrame:
         """Calculate budget vs actual variances."""
         if self.actual_data is None:
             raise ValueError("No actual data set. Call set_actual_data() first.")
@@ -56,13 +66,18 @@ class BudgetAnalyzer:
             budget_amount = expense.amount * num_of_months
 
             variance = budget_amount + actual # actual spend is negative
+            variance_pct = (variance / budget_amount) * -100 if budget_amount != 0 else 0.0
+
+            # Limit to overspend categories if that option is selected
+            if self.only_overspend and variance_pct <= self.overspend_threshold:
+                continue
 
             variance_data = {
                 'category': expense.category,
                 'budgeted': budget_amount,
                 'actual': -actual,
                 'variance': -variance,  # spending less than budget is negative variance
-                'variance_percent': (variance / budget_amount) * -100 if budget_amount != 0 else 0.0
+                'variance_percent': variance_pct
             }
             variances.append(variance_data)
 
@@ -98,6 +113,8 @@ class BudgetAnalyzer:
     def identify_overspending(self, threshold_percent: float = 10.0) -> List[str]:
         """Identify categories with significant overspending."""
         variances = self.calculate_variances()
+        if variances.empty:
+            return []
         overspending = variances[
             variances['variance_percent'] > threshold_percent
         ]
