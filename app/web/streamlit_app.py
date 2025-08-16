@@ -215,9 +215,9 @@ def main():
     if st.session_state.actual_data is None:
         num_of_months = 1
         with col1:
-            st.metric("Total Income", f"${st.session_state.budget.get_total_income() * num_of_months:,.2f}")
+            st.metric("Total Budgeted Income", f"${st.session_state.budget.get_total_income() * num_of_months:,.2f}")
         with col2:
-            st.metric("Total Expenses", f"${st.session_state.budget.get_total_expenses() * num_of_months:,.2f}")
+            st.metric("Total Budgeted Expenses", f"${st.session_state.budget.get_total_expenses() * num_of_months:,.2f}")
         with col3:
             net_budget = st.session_state.budget.get_net_budget()
             st.metric("Net Budget", f"${net_budget * num_of_months:,.2f}", delta=None)
@@ -233,20 +233,19 @@ def main():
         # Get summary statistics
         summary_stats = st.session_state.analyzer.generate_summary_stats()
         with col1:
-            st.metric("Total Income", f"${summary_stats['total_budgeted_income']:,.2f}")
+            st.metric("Total Budgeted Income", f"${summary_stats['total_budgeted_income']:,.2f}")
         with col2:
-            st.metric("Total Expenses", f"${summary_stats['total_budgeted_expenses']:,.2f}")
+            st.metric("Total Budgeted Expenses", f"${summary_stats['total_budgeted_expenses']:,.2f}")
         with col3:
             net_budget = st.session_state.budget.get_net_budget()
             st.metric("Net Budget", f"${summary_stats['budgeted_net']:,.2f}", delta=None)
 
 
 
-
     if num_of_months > 1:
-        st.write(f"**Note:** This analysis is based on {num_of_months} months of data.")
+        st.write(f"**Note:** These budget numbers are  based on a period of {num_of_months} months.")
     else:
-        st.write("**Note:** This analysis is based on a single month of data.")
+        st.write("**Note:** These budget numbers are for a single month.")
 
     # If no actual data, show budget details only
     if st.session_state.actual_data is None:
@@ -291,27 +290,39 @@ def main():
             variance_pct = (variance / summary_stats['budgeted_net']) * 100
             st.metric("Net Variance", f"${variance:,.2f}", delta=f"{variance_pct:.2f}%")
 
+        if num_of_months > 1:
+            st.write(f"**Note:** This analysis is based on {num_of_months} months of data.")
+        else:
+            st.write("**Note:** This analysis is based on a single month of data.")
+
         # Variance analysis
         st.subheader("Category Variance Analysis")
         variance_data = st.session_state.analyzer.calculate_variances()
-        st.dataframe(variance_data,
-                     column_config={
-                         "category": st.column_config.TextColumn("Category"),
-                         "budgeted": st.column_config.NumberColumn("Budgeted",
-                                                                   format="$%.2f",
-                                                                   help="USD"),
-                         "actual": st.column_config.NumberColumn("Actual",
-                                                                 format="$%.2f",
-                                                                 help="USD"),
-                         "variance": st.column_config.NumberColumn("Variance",
-                                                                   format="$%.2f",
-                                                                   help="USD"),
-                         "variance_percent": st.column_config.NumberColumn(
-                             "Variance %",
-                             format="%.1f%%"
-                         ),
-                     }
-        )
+        if variance_data.empty:
+            threshold_pct_str = f"{st.session_state.threshold}%"
+            if st.session_state.only_show_overspend_categories:
+                st.text(f"No overspending categories were found for a {threshold_pct_str} threshold.")
+            else:
+                st.text(f"No variance data is available.")
+        else:
+            st.dataframe(variance_data,
+                         column_config={
+                             "category": st.column_config.TextColumn("Category"),
+                             "budgeted": st.column_config.NumberColumn("Budgeted",
+                                                                       format="$%.2f",
+                                                                       help="USD"),
+                             "actual": st.column_config.NumberColumn("Actual",
+                                                                     format="$%.2f",
+                                                                     help="USD"),
+                             "variance": st.column_config.NumberColumn("Variance",
+                                                                       format="$%.2f",
+                                                                       help="USD"),
+                             "variance_percent": st.column_config.NumberColumn(
+                                 "Variance %",
+                                 format="%.1f%%"
+                             ),
+                         }
+            )
 
         # Overspending alerts
         overspending = st.session_state.analyzer.identify_overspending(st.session_state.threshold)
@@ -333,6 +344,8 @@ def main():
             summary_stats = st.session_state.analyzer.generate_summary_stats()
             fig3 = st.session_state.chart_generator.income_vs_expenses_summary(summary_stats)
             st.plotly_chart(fig3, use_container_width=True)
+        else:
+            st.text(f"No variance data is available.")
 
     with tab3:
         st.header("Raw Data Loaded")
@@ -343,58 +356,61 @@ def main():
     with tab4:
         st.header("Report Generation")
 
-        col1, col2 = st.columns(2)
+        if variance_data.empty:
+            st.text(f"No variance data is availableto generate reports.")
+        else:
+            col1, col2 = st.columns(2)
 
-        with col1:
-            if st.button("📊 Generate PDF Report"):
-                try:
-                    report_generator = ReportGenerator()
-                    variance_data = st.session_state.analyzer.calculate_variances()
-                    summary_stats = st.session_state.analyzer.generate_summary_stats()
+            with col1:
+                if st.button("📊 Generate PDF Report"):
+                    try:
+                        report_generator = ReportGenerator()
+                        variance_data = st.session_state.analyzer.calculate_variances()
+                        summary_stats = st.session_state.analyzer.generate_summary_stats()
 
-                    # Generate report
-                    report_buffer = report_generator.generate_budget_report(
-                        variance_data,
-                        summary_stats,
-                        report_period=f"{start_month[0]} to {end_month[0]}"
-                    )
-
-                    st.download_button(
-                        label="📥 Download PDF Report",
-                        data=report_buffer.getvalue(),
-                        file_name=f"budget_report_{datetime.now().strftime('%Y%m%d')}.pdf",
-                        mime="application/pdf"
-                    )
-
-                except Exception as e:
-                    st.error(f"Error generating report: {str(e)}")
-
-        with col2:
-            if st.button("📈 Export to Excel"):
-                try:
-                    variance_data = st.session_state.analyzer.calculate_variances()
-
-                    # Create Excel file in memory
-                    output = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-
-                    with pd.ExcelWriter(output.name, engine='openpyxl') as writer:
-                        variance_data.to_excel(writer, sheet_name='Variance Analysis', index=False)
-                        st.session_state.actual_data.to_excel(writer, sheet_name='Raw Data', index=False)
-
-                    # Read the file for download
-                    with open(output.name, 'rb') as f:
-                        st.download_button(
-                            label="📥 Download Excel File",
-                            data=f.read(),
-                            file_name=f"budget_analysis_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        # Generate report
+                        report_buffer = report_generator.generate_budget_report(
+                            variance_data,
+                            summary_stats,
+                            report_period=f"{start_month[0]} to {end_month[0]}"
                         )
 
-                    # Clean up
-                    os.unlink(output.name)
+                        st.download_button(
+                            label="📥 Download PDF Report",
+                            data=report_buffer.getvalue(),
+                            file_name=f"budget_report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                            mime="application/pdf"
+                        )
 
-                except Exception as e:
-                    st.error(f"Error exporting to Excel: {str(e)}")
+                    except Exception as e:
+                        st.error(f"Error generating report: {str(e)}")
+
+            with col2:
+                if st.button("📈 Export to Excel"):
+                    try:
+                        variance_data = st.session_state.analyzer.calculate_variances()
+
+                        # Create Excel file in memory
+                        output = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+
+                        with pd.ExcelWriter(output.name, engine='openpyxl') as writer:
+                            variance_data.to_excel(writer, sheet_name='Variance Analysis', index=False)
+                            st.session_state.actual_data.to_excel(writer, sheet_name='Raw Data', index=False)
+
+                        # Read the file for download
+                        with open(output.name, 'rb') as f:
+                            st.download_button(
+                                label="📥 Download Excel File",
+                                data=f.read(),
+                                file_name=f"budget_analysis_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+
+                        # Clean up
+                        os.unlink(output.name)
+
+                    except Exception as e:
+                        st.error(f"Error exporting to Excel: {str(e)}")
 
 
 if __name__ == "__main__":
