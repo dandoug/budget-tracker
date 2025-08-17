@@ -29,6 +29,14 @@ class Category(BaseModel):
 
         return data
 
+    def get_subcategory(self, subcategory_name: str) -> Optional['Category']:
+        if self.subcategories:
+            for subcategory in self.subcategories:
+                if subcategory.category == subcategory_name:
+                    return subcategory
+
+        return None
+
     def get_total_amount(self) -> float:
         """Calculate the total amount including subcategories."""
         if self.amount is not None:
@@ -119,6 +127,20 @@ class Budget(BaseModel):
     @property
     def budget_category_map(self) -> Dict[str, Category]:
         return self._budget_category_map
+
+    def get_expense_category(self, cat_name: str) -> Category:
+        """ Return the top level expense category for a category name"""
+        for cat in self._iter_categories_with_amount(self.expenses):
+            if cat.category == cat_name:
+                return cat
+        return None
+
+    def get_income_category(self, cat_name: str) -> Category:
+        """ Return the top level income category for a category name"""
+        for cat in self._iter_categories_with_amount(self.income):
+            if cat.category == cat_name:
+                return cat
+        return None
 
     def get_income_categories(self) -> List[Category]:
         """Return all income categories (including subcategories) with a defined amount."""

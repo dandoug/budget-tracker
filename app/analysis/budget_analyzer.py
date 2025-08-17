@@ -87,15 +87,15 @@ class BudgetAnalyzer:
         """Calculate totals by budget category."""
         # Create a copy of actual data that includes the category column and only
         # the data columns from the start_month to end_month
-        columns_to_include = ['Category'] + list(self.actual_data.columns[self.start_month[1]:self.end_month[1] + 1])
+        columns_to_include = list(self.actual_data.columns[self.start_month[1]:self.end_month[1] + 1])
         actual_data_subset = self.actual_data[columns_to_include].copy()
 
         # Sum across all months to get total
         actual_data_subset['Total'] = actual_data_subset.iloc[:, 1:].sum(axis=1)
 
         # Create a simplified view of actual data grouped by matched categories
-        actual_spending = actual_data_subset[['Category', 'Total']].copy()
-        actual_spending['Budget_Category'] = actual_spending['Category'].apply(
+        actual_spending = actual_data_subset[['Total']].copy()
+        actual_spending['Budget_Category'] = actual_spending.index.map(
             lambda x: self.budget.get_budget_category(x).category if self.budget.get_budget_category(x) else None
         )
         actual_spending = actual_spending[actual_spending['Budget_Category'].notna()]

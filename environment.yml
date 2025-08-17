@@ -18,3 +18,4 @@ dependencies:
     - jsonschema
     - watchdog
     - openpyxl
+    - pytest

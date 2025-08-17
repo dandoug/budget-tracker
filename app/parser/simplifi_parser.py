@@ -46,7 +46,8 @@ class SimplifiParser:
             else:
                 raise ValueError(f"Unsupported file format: {file_path.suffix}")
 
-            self.data = self._clean_data(df)
+            self.data = self._clean_data(df).set_index('Category')
+
             return self.data
 
         except Exception as e:
@@ -123,4 +124,4 @@ class SimplifiParser:
         if self.data is None:
             raise ValueError("No data loaded. Call load_file() first.")
 
-        self.data.to_csv(output_path, index=False)
+        self.data.to_csv(output_path, index=True)

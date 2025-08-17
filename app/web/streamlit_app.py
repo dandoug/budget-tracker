@@ -350,8 +350,7 @@ def main():
     with tab3:
         st.header("Raw Data Loaded")
 
-        indexed_df = st.session_state.actual_data.set_index('Category')
-        st.dataframe(indexed_df, use_container_width=True)
+        st.dataframe(st.session_state.actual_data, use_container_width=True)
 
     with tab4:
         st.header("Report Generation")
