@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 # Define pages using paths relative to this file's folder (app/web)
-home = st.Page("streamlit_app.py", title="Home", icon="🏠")
+home = st.Page("streamlit_app.py", title="Home", icon="💰")
 edit_budget = st.Page("pages/edit_budget.py", title="Edit Budget", icon="✏️")
 
 # Optional: group pages under sections to organize the sidebar menu
