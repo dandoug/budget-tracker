@@ -22,4 +22,4 @@ RUN rm -rf tests
 
 EXPOSE 8501
 
-ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "budget-tracker", "streamlit", "run", "app/web/streamlit_app.py", "--server.address=0.0.0.0"]
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "budget-tracker", "streamlit", "run", "app/web/app_nav.py", "--server.address=0.0.0.0"]

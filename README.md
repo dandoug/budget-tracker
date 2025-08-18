@@ -130,7 +130,7 @@ Use the included Dockerfile for containerized deployment to any platform that su
 ### Self-hosted
 Run directly with Streamlit on your own server:
 ``` bash
-streamlit run app/web/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+streamlit run app/web/app_nav.py --server.port 8501 --server.address 0.0.0.0
 ```
 
 ## Contributing
