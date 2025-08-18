@@ -91,7 +91,7 @@ class BudgetAnalyzer:
         actual_data_subset = self.actual_data[columns_to_include].copy()
 
         # Sum across all months to get total
-        actual_data_subset['Total'] = actual_data_subset.iloc[:, 1:].sum(axis=1)
+        actual_data_subset['Total'] = actual_data_subset.sum(axis=1)
 
         # Create a simplified view of actual data grouped by matched categories
         actual_spending = actual_data_subset[['Total']].copy()
