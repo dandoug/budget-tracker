@@ -1,8 +1,21 @@
 """Edit Budget page scaffold."""
 
-from typing import Optional
-
 import streamlit as st
+
+from app.editor.budget_editor import flatten_categories, render_editor_table, apply_changes_to_working_copy
+
+# Small compatibility shim for Streamlit rerun API changes
+def _rerun():
+    # Prefer new API
+    if hasattr(st, "rerun"):
+        st.rerun()
+    # Backward compatibility (older Streamlit versions)
+    elif hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()
+    # Last resort: nudge a re-render
+    else:
+        st.session_state["_force_rerender"] = st.session_state.get("_force_rerender", 0) + 1
+
 
 # Page configuration must be the first Streamlit command
 st.set_page_config(page_title="Edit Budget", page_icon="✏️", layout="wide")
@@ -56,7 +69,7 @@ if hasattr(st, "dialog"):
         with c2:
             if st.button("Stay on page"):
                 st.session_state.show_leave_modal = False
-                st.experimental_rerun()
+                _rerun()
 
     @st.dialog("Discard changes?")
     def _confirm_discard_modal():
@@ -72,11 +85,11 @@ if hasattr(st, "dialog"):
                 st.session_state.unsaved_changes = False
                 st.session_state.show_discard_modal = False
                 st.success("All unsaved changes have been discarded.")
-                st.experimental_rerun()
+                _rerun()
         with c2:
             if st.button("Keep editing"):
                 st.session_state.show_discard_modal = False
-                st.experimental_rerun()
+                _rerun()
 
 # If user requested to open a modal, show it
 if hasattr(st, "dialog"):
@@ -88,17 +101,17 @@ if hasattr(st, "dialog"):
 # Toolbar
 tcol1, tcol2, tcol3 = st.columns([1, 1, 1])
 with tcol1:
-    if st.button("Save Changes", type="primary", use_container_width=True):
+    if st.button("💾 Save Changes", use_container_width=True):
         # Persist working copy as the live budget
         st.session_state.budget = st.session_state.working_budget
         st.session_state.unsaved_changes = False
         st.success("Changes saved.")
 with tcol2:
-    if st.button("Cancel Changes", use_container_width=True):
+    if st.button("🗑️ Cancel Changes", use_container_width=True):
         if st.session_state.unsaved_changes and hasattr(st, "dialog"):
             # Prompt before discarding changes
             st.session_state.show_discard_modal = True
-            st.experimental_rerun()
+            _rerun()
         else:
             # Reset working copy from live budget immediately
             base_budget = st.session_state.budget
@@ -112,7 +125,7 @@ with tcol3:
         if st.session_state.unsaved_changes and hasattr(st, "dialog"):
             # Prompt before leaving
             st.session_state.show_leave_modal = True
-            st.experimental_rerun()
+            _rerun()
         else:
             if hasattr(st, "switch_page"):
                 st.switch_page("streamlit_app.py")
@@ -130,5 +143,20 @@ if st.session_state.unsaved_changes:
 
 # Placeholder content for the editor UI (to be implemented)
 st.subheader("Editor")
-st.write("This is a scaffold for the budget editor. The editable tree/table UI will be added here.")
-st.caption("Tip: Any edits in this section should flip an 'unsaved changes' flag in session_state.")
+
+st.write("**Income**")
+edited_income_df = render_editor_table(flatten_categories(
+    st.session_state.working_budget.income, is_income=True),
+    key="income_categories_edit_table")
+
+st.session_state.unsaved_changes = (st.session_state.unsaved_changes or
+                                    apply_changes_to_working_copy(edited_income_df, st.session_state.working_budget))
+
+st.write("**Expenses**")
+edited_expense_df = render_editor_table(flatten_categories(
+    st.session_state.working_budget.expenses, is_income=False),
+    key="expense_categories_edit_table")
+
+st.session_state.unsaved_changes = (st.session_state.unsaved_changes or
+                                    apply_changes_to_working_copy(edited_expense_df, st.session_state.working_budget))
+

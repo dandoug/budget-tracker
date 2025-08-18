@@ -59,6 +59,8 @@ class Budget(BaseModel):
     expenses: List[Category]
     # Private attribute to hold the category -> budget_category map
     _budget_category_map: Dict[str, Category] = PrivateAttr(default_factory=dict)
+    # Private attribute to hold the category_name -> category map  category names are unique
+    _category_name_map: Dict[str, Category] = PrivateAttr(default_factory=dict)
 
 
     @model_validator(mode='before')
@@ -91,9 +93,11 @@ class Budget(BaseModel):
     def model_post_init(self, __context) -> None:
         """Build the category -> budget_category map after validation."""
         self._budget_category_map.clear()
+        self._category_name_map.clear()
 
         def populate_map(categories: List[Category], current_budget_cat: Optional[Category]) -> None:
             for cat in categories:
+                self._category_name_map[cat.category] = cat
                 # If this category specifies an amount, it becomes the current budget category
                 next_budget_cat = cat if cat.amount is not None else current_budget_cat
 
@@ -123,6 +127,10 @@ class Budget(BaseModel):
     def get_budget_category(self, cat: str) -> Category:
         """Use the budget category map to return the budget category for a category name"""
         return self._budget_category_map[cat] if cat in self._budget_category_map else None
+
+    def get_category_from_name(self, cat: str) -> str:
+        """Use the category name map to return the category for a category name"""
+        return self._category_name_map[cat] if cat in self._category_name_map else None
 
     @property
     def budget_category_map(self) -> Dict[str, Category]:
