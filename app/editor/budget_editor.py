@@ -42,14 +42,13 @@ def render_editor_table(df, key: str) -> pd.DataFrame:
     df = df.copy()
     df["name"] = df.apply(lambda r: ("    " * r["level"]) + ("• " if r["level"] else "") + r["category"], axis=1)
 
-    # Render and return the edited DataFrame
-    hidden_cat_column_config = st.column_config.TextColumn("Category", disabled=True)
-    hidden_cat_column_config['hidden'] = True
+    # Put category into the index so it stays in the data but can be hidden visually
+    df = df.set_index("category", drop=False)
+
     edited_df = st.data_editor(
         df[["name", "category", "inherited", "amount"]],
         column_config={
             "name": st.column_config.TextColumn("Category", disabled=True),
-            "category": hidden_cat_column_config,
             "inherited": st.column_config.CheckboxColumn("Inherited"),
             "amount": st.column_config.NumberColumn("Amount", format="$%.2f", step=10.0, min_value=0.0),
         },
@@ -81,8 +80,8 @@ def apply_changes_to_working_copy(edit_table_df: pd.DataFrame, working_budget: B
     """
     changes_made = False
 
-    for _, row in edit_table_df.iterrows():
-        current_category = working_budget.get_category_from_name(row["category"])
+    for idx, row in edit_table_df.iterrows():
+        current_category = working_budget.get_category_from_name(idx)
         # Compute the desired new amount based on 'inherited' and user entry
         if bool(row.get("inherited", False)):
             if current_category.amount is not None:

@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Optional
 
+import hashlib
 import pandas as pd
 import streamlit as st
 import yaml
@@ -42,6 +43,30 @@ if 'analyzer' not in st.session_state:
     st.session_state.analyzer = None
 if 'chart_generator' not in st.session_state:
     st.session_state.chart_generator = ChartGenerator()
+# Persist uploaded filenames across page navigation
+if 'budget_filename' not in st.session_state:
+    st.session_state.budget_filename = None
+if 'simplifi_filename' not in st.session_state:
+    st.session_state.simplifi_filename = None
+# Track last uploaded Simplifi file content to auto-reload on change
+if 'simplifi_file_digest' not in st.session_state:
+    st.session_state.simplifi_file_digest = None
+# Persist month range selections across navigation
+if 'start_month_label' not in st.session_state:
+    st.session_state.start_month_label = None
+if 'end_month_label' not in st.session_state:
+    st.session_state.end_month_label = None
+# Persist threshold and overspend filter selections across navigation
+if 'threshold' not in st.session_state:
+    st.session_state.threshold = 10.0
+if 'only_show_overspend_categories' not in st.session_state:
+    st.session_state.only_show_overspend_categories = False
+# Track budget reloads to keep editor working copy in sync
+if 'budget_version' not in st.session_state:
+    st.session_state.budget_version = 0
+# Track last uploaded budget file content to auto-reload on change
+if 'budget_file_digest' not in st.session_state:
+    st.session_state.budget_file_digest = None
 
 
 def load_budget_file(uploaded_file) -> Optional[Budget]:
@@ -111,12 +136,24 @@ def main():
         )
 
         if budget_file is not None:
-            if st.session_state.budget is None or st.button("Reload Budget"):
+            # Auto-reload when the uploaded file content changes
+            _budget_bytes = budget_file.getvalue()
+            _new_digest = hashlib.sha256(_budget_bytes).hexdigest()
+            _changed_file = st.session_state.get("budget_file_digest") != _new_digest
+            if st.session_state.budget is None or _changed_file or st.button("Reload Budget"):
                 st.session_state.budget = load_budget_file(budget_file)
                 if st.session_state.budget:
                     st.success("Budget loaded successfully!")
+                    st.session_state.budget_filename = budget_file.name
+                    st.session_state.budget_file_digest = _new_digest
+                    # Bump budget version and reset editor working copy state so the editor reflects the new file
+                    st.session_state.budget_version = st.session_state.get("budget_version", 0) + 1
                     # Reset analyzer when budget changes
                     st.session_state.analyzer = None
+
+        # Show persisted budget filename even if uploader is empty
+        if st.session_state.get('budget_filename'):
+            st.caption(f"Loaded budget file: {st.session_state.budget_filename}")
 
         # Simplifi file upload
         st.subheader("Actual Spending Data")
@@ -127,12 +164,22 @@ def main():
         )
 
         if simplifi_file is not None:
-            if st.session_state.actual_data is None or st.button("Reload Data"):
+            # Auto-reload when the uploaded file content changes
+            _simp_bytes = simplifi_file.getvalue()
+            _simp_digest = hashlib.sha256(_simp_bytes).hexdigest()
+            _changed_simplifi = st.session_state.get("simplifi_file_digest") != _simp_digest
+            if st.session_state.actual_data is None or _changed_simplifi or st.button("Reload Data"):
                 st.session_state.actual_data = load_simplifi_file(simplifi_file)
                 if st.session_state.actual_data is not None:
                     st.success("Simplifi data loaded successfully!")
+                    st.session_state.simplifi_filename = simplifi_file.name
+                    st.session_state.simplifi_file_digest = _simp_digest
                     # Reset analyzer when data changes
                     st.session_state.analyzer = None
+
+        # Show persisted Simplifi filename even if uploader is empty
+        if st.session_state.get('simplifi_filename'):
+            st.caption(f"Loaded Simplifi file: {st.session_state.simplifi_filename}")
 
         # Analysis controls
         if st.session_state.budget and st.session_state.actual_data is not None:
@@ -151,36 +198,56 @@ def main():
 
             # Beginning month selection
             st.subheader("Select Month Range")
+
+            # Determine default indices from previously selected labels (if any)
+            _start_label = st.session_state.get("start_month_label")
+            _end_label = st.session_state.get("end_month_label")
+            default_start_idx = next((i for i, opt in enumerate(month_options) if opt[0] == _start_label), 0)
+            default_end_idx = next((i for i, opt in enumerate(month_options) if opt[0] == _end_label),
+                                   len(month_options) - 1 if month_options else 0)
+            # Ensure start <= end
+            if month_options and default_start_idx > default_end_idx:
+                default_end_idx = default_start_idx
+
             start_month = st.selectbox(
                 "Start Month",
                 options=month_options,
                 format_func=lambda x: x[0],
-                index=0
+                index=default_start_idx
             )
+            # Persist chosen start month label
+            st.session_state.start_month_label = start_month[0]
 
             end_month = st.selectbox(
                 "End Month",
                 options=month_options,
                 format_func=lambda x: x[0],
-                index=len(month_options) - 1
+                index=default_end_idx
             )
-
+            # Persist chosen end month label
+            st.session_state.end_month_label = end_month[0]
 
             # Threshold percentage selection
             st.subheader("Threshold Settings")
             threshold_options = [(2.0, "2%"), (5.0, "5%"), (10.0, "10%"), (25.0, "25%"), (50.0, "50%")]
+            # Restore previously selected threshold (fallback to 10%)
+            default_threshold_idx = next(
+                (i for i, opt in enumerate(threshold_options) if opt[0] == st.session_state.get("threshold", 10.0)),
+                2
+            )
             threshold = st.selectbox(
                 "Variance Threshold",
                 options=threshold_options,
                 format_func=lambda x: x[1],
-                index=2,  # Default to 10%
+                index=default_threshold_idx,
                 help="Threshold for highlighting significant variances"
             )
             st.session_state.threshold = threshold[0]
 
+            # Restore and persist overspend-only filter
             st.session_state.only_show_overspend_categories = st.checkbox(
                 "Only show overspend categories",
-                value=False,
+                value=st.session_state.get("only_show_overspend_categories", False),
                 help="Show only categories where actual spending exceeds budget by threshold"
             )
 
