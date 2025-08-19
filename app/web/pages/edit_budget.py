@@ -8,7 +8,7 @@ st.set_page_config(page_title="Edit Budget", page_icon="✏️", layout="wide")
 # edit_budget_helpers must be imported AFTER st.set_page_config
 from app.web.pages.edit_budget_helpers import apply_edit_changes_update_flag, \
     initialize_editor_state, EXPENSE_CATEGORIES_EDIT_TABLE_KEY, \
-    INCOME_CATEGORIES_EDIT_TABLE_KEY, toolbar, show_modals
+    INCOME_CATEGORIES_EDIT_TABLE_KEY, toolbar, show_modals, INCOME_CATEGORIES_WIDGET_KEY, EXPENSE_CATEGORIES_WIDGET_KEY
 
 st.title("✏️ Edit Budget")
 st.caption("Adjust budgeted amounts. Category structure edits are not supported here.")
@@ -39,12 +39,12 @@ st.header("Editor")
 st.subheader("Income")
 st.session_state[INCOME_CATEGORIES_EDIT_TABLE_KEY] = render_editor_table(flatten_categories(
     st.session_state.working_budget.income, is_income=True),
-    key="income_cat_edit")
+    key=INCOME_CATEGORIES_WIDGET_KEY)
 
 st.subheader("Expenses")
 st.session_state[EXPENSE_CATEGORIES_EDIT_TABLE_KEY] = render_editor_table(flatten_categories(
     st.session_state.working_budget.expenses, is_income=False),
-    key="expense_cat_edit")
+    key=EXPENSE_CATEGORIES_WIDGET_KEY)
 
 apply_edit_changes_update_flag()
 

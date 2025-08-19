@@ -46,7 +46,7 @@ def render_editor_table(df, key: str) -> pd.DataFrame:
     df = df.set_index("category", drop=False)
 
     edited_df = st.data_editor(
-        df[["name", "category", "inherited", "amount"]],
+        df[["name", "inherited", "amount"]],
         column_config={
             "name": st.column_config.TextColumn("Category", disabled=True),
             "inherited": st.column_config.CheckboxColumn("Inherited"),

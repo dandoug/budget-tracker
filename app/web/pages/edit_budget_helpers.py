@@ -6,21 +6,44 @@ from app.web.utilities import rerun
 
 EXPENSE_CATEGORIES_EDIT_TABLE_KEY = "expense_categories_edit_table"
 INCOME_CATEGORIES_EDIT_TABLE_KEY = "income_categories_edit_table"
+# Add stable widget keys for the two data editors so we can clear their widget state
+INCOME_CATEGORIES_WIDGET_KEY = "income_cat_edit"
+EXPENSE_CATEGORIES_WIDGET_KEY = "expense_cat_edit"
+_EDITOR_WIDGET_KEY_MAP = {
+    INCOME_CATEGORIES_EDIT_TABLE_KEY: INCOME_CATEGORIES_WIDGET_KEY,
+    EXPENSE_CATEGORIES_EDIT_TABLE_KEY: EXPENSE_CATEGORIES_WIDGET_KEY,
+}
+
 
 def clear_editor_state():
     st.session_state.unsaved_changes = False
     for _k in (INCOME_CATEGORIES_EDIT_TABLE_KEY, EXPENSE_CATEGORIES_EDIT_TABLE_KEY):
         if _k in st.session_state:
             del st.session_state[_k]
+    # Also clear the underlying data editor widget states
+    for _wk in (INCOME_CATEGORIES_WIDGET_KEY, EXPENSE_CATEGORIES_WIDGET_KEY):
+        if _wk in st.session_state:
+            del st.session_state[_wk]
 
 
 def apply_edit_changes_update_flag():
+    rerun_needed = False
     for _k in (INCOME_CATEGORIES_EDIT_TABLE_KEY, EXPENSE_CATEGORIES_EDIT_TABLE_KEY):
         if _k in st.session_state:
-            st.session_state.unsaved_changes = (
-                st.session_state.unsaved_changes or
-                apply_changes_to_working_copy(st.session_state[_k], st.session_state.working_budget)
+            changes = apply_changes_to_working_copy(
+                st.session_state[_k], st.session_state.working_budget
             )
+            st.session_state.unsaved_changes = st.session_state.unsaved_changes or changes
+            if changes:
+                # Clear the data editor widget state so Streamlit doesn't replay stale patches
+                _widget_key = _EDITOR_WIDGET_KEY_MAP.get(_k)
+                if _widget_key and _widget_key in st.session_state:
+                    del st.session_state[_widget_key]
+                rerun_needed = True
+    # Important: rerun immediately so editors re-render without stale patches during this cycle
+    if rerun_needed:
+        rerun()
+
 
 
 def setup_working_budget_copy():
