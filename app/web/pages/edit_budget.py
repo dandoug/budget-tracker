@@ -59,6 +59,7 @@ def _setup_working_budget_copy():
     st.session_state.working_budget = (
         base_budget.model_copy(deep=True) if hasattr(base_budget, "model_copy") else base_budget
     )
+    st.session_state.working_budget.model_post_init(None)
     st.session_state.working_budget_version = st.session_state.budget_version
 
 
@@ -188,14 +189,14 @@ st.divider()
 st.subheader("Editor")
 
 st.write("**Income**")
-render_editor_table(flatten_categories(
+st.session_state[INCOME_CATEGORIES_EDIT_TABLE_KEY] = render_editor_table(flatten_categories(
     st.session_state.working_budget.income, is_income=True),
-    key=INCOME_CATEGORIES_EDIT_TABLE_KEY)
+    key="income_cat_edit")
 
 st.write("**Expenses**")
-render_editor_table(flatten_categories(
+st.session_state[EXPENSE_CATEGORIES_EDIT_TABLE_KEY] = render_editor_table(flatten_categories(
     st.session_state.working_budget.expenses, is_income=False),
-    key=EXPENSE_CATEGORIES_EDIT_TABLE_KEY)
+    key="expense_cat_edit")
 
 _apply_edit_changes_update_flag()
 
