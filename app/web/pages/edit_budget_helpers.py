@@ -1,7 +1,8 @@
 """Helper methods for edit_budget page"""
 import streamlit as st
+import yaml
 
-from app.editor.budget_editor import apply_changes_to_working_copy
+from app.editor.budget_editor import apply_changes_to_working_copy, budget_to_yaml_dict
 from app.web.utilities import rerun
 
 EXPENSE_CATEGORIES_EDIT_TABLE_KEY = "expense_categories_edit_table"
@@ -118,7 +119,8 @@ def confirm_discard_modal():
 
 def toolbar():
     global st
-    tcol1, tcol2, tcol3 = st.columns([1, 1, 1])
+    # Add a fourth column for Download
+    tcol1, tcol2, tcol3, tcol4 = st.columns([1, 1, 1, 1])
     with tcol1:
         if st.button("💾 Save Changes", use_container_width=True):
             # Persist working copy as the live budget (deep copy for safety)
@@ -155,6 +157,22 @@ def toolbar():
                 rerun()
             else:
                 st.switch_page("streamlit_app.py")
+    with tcol4:
+        # Prepare YAML from the working copy without mutating any state
+        yaml_dict = budget_to_yaml_dict(st.session_state.working_budget)
+        yaml_text = yaml.safe_dump(
+            yaml_dict,
+            sort_keys=False,
+            default_flow_style=False,
+            allow_unicode=True
+        )
+        st.download_button(
+            "⬇️ Download YAML",
+            data=yaml_text,
+            file_name="working_budget.yaml",
+            mime="text/yaml",
+            use_container_width=True
+        )
 
 
 def show_modals():

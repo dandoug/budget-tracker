@@ -59,20 +59,6 @@ def render_editor_table(df, key: str) -> pd.DataFrame:
     )
     return edited_df
 
-# python
-def category_to_yaml_dict(cat):
-    data = {"category": cat["category"]}
-    if cat["is_top_level"]:
-        # Top-level: include amount if set, otherwise omit (or include explicitly None)
-        data["amount"] = cat["amount"] if cat["amount"] is not None else None
-    else:
-        if cat["inherited"]:
-            data["amount"] = "INHERITED"
-        else:
-            data["amount"] = cat["amount"]
-    return data
-
-
 def apply_changes_to_working_copy(edit_table_df: pd.DataFrame, working_budget: Budget) -> bool:
     """
     Apply any changes made by the user to the working budget
@@ -100,3 +86,35 @@ def apply_changes_to_working_copy(edit_table_df: pd.DataFrame, working_budget: B
         working_budget.model_post_init(None)
 
     return changes_made
+
+
+def _category_model_to_yaml_dict(cat: Category, is_top_level: bool) -> dict:
+    """
+    Convert a Category model (and its subtree) into a YAML-friendly dict.
+    Rules:
+    - Top-level categories: amount is the numeric value or None.
+    - Non-top-level categories: if amount is None, serialize as "INHERITED", else numeric.
+    """
+    data = {"category": cat.category}
+    if is_top_level:
+        data["amount"] = cat.amount if cat.amount is not None else None
+    else:
+        data["amount"] = "INHERITED" if cat.amount is None else cat.amount
+
+    if cat.subcategories:
+        data["subcategories"] = [
+            _category_model_to_yaml_dict(sub, False) for sub in cat.subcategories
+        ]
+    return data
+
+
+def budget_to_yaml_dict(budget: Budget) -> dict:
+    """
+    Convert a full Budget model into a YAML-friendly dict.
+    Does not mutate the model and includes the full category hierarchy.
+    """
+    return {
+        "income": [_category_model_to_yaml_dict(cat, True) for cat in budget.income],
+        "expenses": [_category_model_to_yaml_dict(cat, True) for cat in budget.expenses],
+    }
+
