@@ -2,14 +2,14 @@
 import os
 import sys
 import tempfile
-from datetime import datetime, date, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import hashlib
 import pandas as pd
 import streamlit as st
-import yaml
+
 
 # Ensure the project root (which contains the 'app' package) is on sys.path
 # This makes `from app.* import ...` work when this file is run from app/web
@@ -21,7 +21,6 @@ if str(_PROJECT_ROOT) not in sys.path:
 from app.parser.budget_loader import BudgetLoader, Budget
 from app.parser.simplifi_parser import SimplifiParser
 from app.analysis.budget_analyzer import BudgetAnalyzer
-from app.analysis.category_matcher import CategoryMatcher
 from app.output.charts import ChartGenerator
 from app.output.report_generator import ReportGenerator
 
@@ -67,6 +66,10 @@ if 'budget_version' not in st.session_state:
 # Track last uploaded budget file content to auto-reload on change
 if 'budget_file_digest' not in st.session_state:
     st.session_state.budget_file_digest = None
+# ["plotly_white", "plotly_dark", "ggplot2", "seaborn"],
+if 'chart_theme' not in st.session_state:
+    st.session_state.chart_theme = "plotly_dark"
+st.session_state.chart_generator.set_theme(st.session_state.chart_theme)
 
 
 def load_budget_file(uploaded_file) -> Optional[Budget]:
@@ -250,16 +253,6 @@ def main():
                 value=st.session_state.get("only_show_overspend_categories", False),
                 help="Show only categories where actual spending exceeds budget by threshold"
             )
-
-            st.subheader("Chart Controls")
-            chart_theme = st.selectbox(
-                "Chart theme",
-                ["plotly_white", "plotly_dark", "ggplot2", "seaborn"],
-                help="Select chart theme"
-            )
-
-            # Update chart theme
-            st.session_state.chart_generator.set_theme(chart_theme)
 
     # Main content area
     if st.session_state.budget is None:

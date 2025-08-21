@@ -2,11 +2,8 @@
 
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
-from datetime import datetime, date
-import numpy as np
 
 from app.parser.budget_loader import Budget
-from app.analysis.category_matcher import CategoryMatcher
 
 
 class BudgetAnalyzer:
@@ -15,7 +12,6 @@ class BudgetAnalyzer:
     def __init__(self, budget: Budget):
         self.budget = budget
         self.actual_data: Optional[pd.DataFrame] = None
-        self.matcher: Optional[CategoryMatcher] = None
         self.start_month: Optional[Tuple[str,int]] = None # format is (columname, columindex)
         self.end_month: Optional[Tuple[str,int]] = None
         self.overspend_threshold: Optional[float] = 10.0
@@ -26,7 +22,6 @@ class BudgetAnalyzer:
         self.actual_data = data
         # Initialize category matcher with budget categories
         budget_categories = [exp.category for exp in self.budget.get_expense_categories()]
-        self.matcher = CategoryMatcher(budget_categories)
         
     def set_analysis_date_range(self, start_month: tuple[str,int], end_month: tuple[str,int]) -> None:
         """Set date range for analysis."""
