@@ -158,8 +158,8 @@ def main():
         # Simplifi file upload
         st.subheader("Actual Spending Data")
         simplifi_file = st.file_uploader(
-            "Upload Simplifi Export",
-            type=['csv', 'xlsx'],
+            "Upload Simplifi P&L Report Export (excel format)",
+            type=['xlsx'],
             help="Upload your Simplifi P&L export file"
         )
 
