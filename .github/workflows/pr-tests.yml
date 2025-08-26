@@ -1,0 +1,26 @@
+name: 'Run Pytest on PR (Conda)'
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Conda environment'
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          # Use your environment.yml file to create the Conda environment
+          environment-file: environment.yml
+          activate-environment: budget-tracker
+
+      - name: 'Run tests with pytest'
+        # This shell command ensures the Conda environment is properly activated
+        shell: bash -l {0}
+        run: pytest
