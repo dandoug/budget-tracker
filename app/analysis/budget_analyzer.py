@@ -80,13 +80,22 @@ class BudgetAnalyzer:
 
     def summarize_totals_by_budget_category(self) -> pd.Series:
         """Calculate totals by budget category."""
-        # Create a copy of actual data that includes the category column and only
-        # the data columns from the start_month to end_month
+        # Create a copy of actual data that includes only the selected month columns.
         columns_to_include = list(self.actual_data.columns[self.start_month[1]:self.end_month[1] + 1])
         actual_data_subset = self.actual_data[columns_to_include].copy()
 
-        # Sum across all months to get total
-        actual_data_subset['Total'] = actual_data_subset.sum(axis=1)
+        # Drop known helper columns if they fall inside the selected column range.
+        helper_columns = ["HierarchyLevel", "Total"]
+        actual_data_subset = actual_data_subset.drop(
+            columns=[col for col in helper_columns if col in actual_data_subset.columns],
+            errors="ignore",
+        )
+
+        # Ensure all selected month values are numeric before summing.
+        actual_data_subset = actual_data_subset.apply(pd.to_numeric, errors="coerce").fillna(0.0)
+
+        # Sum across all selected months to get total.
+        actual_data_subset["Total"] = actual_data_subset.sum(axis=1)
 
         # Create a simplified view of actual data grouped by matched categories
         actual_spending = actual_data_subset[['Total']].copy()

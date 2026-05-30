@@ -59,8 +59,8 @@ def main():
         # Simplifi file upload
         st.subheader("Actual Spending Data")
         simplifi_file = st.file_uploader(
-            "Upload Simplifi P&L Report Export (excel format)",
-            type=['xlsx'],
+            "Upload Simplifi P&L Report Export (csv-matrix format)",
+            type=['csv'],
             help="Upload your Simplifi P&L export file"
         )
 
@@ -80,7 +80,7 @@ def main():
             columns = list(st.session_state.actual_data.columns)
 
             # Remove Category, Total, and HierarchyLevel from options
-            exclude_cols = ['Category', 'Total', 'HierarchyLevel']
+            exclude_cols = ['Category', 'Total', 'HierarchyLevel', 'Income/Expense']
             month_columns = [col for col in columns if col not in exclude_cols]
 
             # Create options list with (label, index) tuples

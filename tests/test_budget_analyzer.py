@@ -24,9 +24,9 @@ def budget(project_root):
 
 @pytest.fixture(scope="module")
 def actual_df(project_root):
-    xlsx_path = project_root / "data" / "sample_Simplifi-profit-loss.xlsx"
+    data_path = project_root / "data" / "sample_Simplifi-profit-loss-new.csv"
     parser = SimplifiParser()
-    df = parser.load_file(xlsx_path)
+    df = parser.load_file(data_path)
     # Ensure expected structure: index is categories, columns include month columns and 'HierarchyLevel'
     assert "HierarchyLevel" in df.columns
     assert df.index.name == "Category"
